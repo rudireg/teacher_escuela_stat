@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_share/flutter_share.dart';
 import 'package:flutter/material.dart';
@@ -31,6 +32,7 @@ class StatisticPageState extends State<StatisticPage> {
   String _hasNewWordsLast24Hours = '...';
   String _largestSetOfWords = '...';
   String _emailLargestSetOfWords = '';
+  String _export = '';
 
   @override
   Widget build(BuildContext context) {
@@ -84,6 +86,7 @@ class StatisticPageState extends State<StatisticPage> {
           child: ListTile(
             onTap: _shareStudentsEmail,
             title: Text('Share student\'s email'),
+            trailing: Text(this._export),
           ),
         ),
       ],
@@ -204,14 +207,41 @@ class StatisticPageState extends State<StatisticPage> {
 
   // Write data to the file
   Future<File> saveEmails(List<Record> students) async {
-    final file = await _localFile;
-    List<String> emails = [];
-    students.forEach((Record record) {
-      if (record.email.isNotEmpty) {
-        emails.add(record.email);
-      }
+    setState(() {
+      this._export = 'wait...';
     });
-    file.writeAsString(emails.join('\r\n'));
+    final file = await _localFile;
+    List<String> lines = [];
+    List<String> parts = [];
+    lines.add('Email;Name;Phone;Date;tranid;formid;formname;Последний комментарий;Skype;comment_form;Status ID');
+    await Future.forEach(students, (Record record) async {
+      if (record.email.isNotEmpty) {
+        var date = '';
+        parts.clear();
+        var docs = await record.reference.collection('words').getDocuments();
+        if (docs.documents.length > 0) {
+          var formatter = new DateFormat('yyyy-MM-dd');
+          date = formatter.format(docs.documents[0].data['start'].toDate());
+        }
+        parts.add(record.email); // Email
+        parts.add(record.name); // Name
+        parts.add(''); // Phone
+        parts.add(date.toString()); // Date
+        parts.add('EscuelaApp'); // tranid
+        parts.add(''); // formid
+        parts.add(''); // formname
+        parts.add(''); // Последний комментарий
+        parts.add(''); // Skype
+        parts.add(''); // comment_form
+        parts.add(''); // Status ID
+        lines.add(parts.join(';'));
+      }
+    }).then((onValue) {
+      file.writeAsString(lines.join('\r\n'));
+      setState(() {
+        this._export = '';
+      });
+    });
     return file;
   }
 
